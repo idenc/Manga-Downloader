@@ -1,7 +1,43 @@
+import threading
+
 import requests
 import os
 import re
 from bs4 import BeautifulSoup
+from display import Display
+
+
+def gen_title(link):
+    """Finds title of manga and removes any illegal characters"""
+    page = requests.post(link, data=dict(adult="true"))
+    soup = BeautifulSoup(page.text, 'lxml')
+
+    title = soup.find('h1', {"class": "hb dnone"}).find('a').get('title')
+
+    # Search for invalid characters and remove them.
+    return re.sub('[^A-Za-z0-9 ]+', '', title)
+
+
+def make_directory(title, volume):
+    """Makes directories for manga"""
+
+
+def get_volume(soup):
+    """Finds volume num"""
+    volume = soup.find('h1', {"class": "hb dnone"}).findAll('a')
+    volume = volume[1].get('title')
+
+    # Grab first number in title
+    temp = re.findall('\d+', volume)
+    return "Volume " + temp[0]
+
+
+def write_image(image, title, volume, counter):
+    """Writes image to a file"""
+    # Write the image to a file in chapter directory
+    imagefile = open(title + "/" + volume + "/" + str(counter) + ".png", 'wb')
+    imagefile.write(image.content)
+    imagefile.close()
 
 
 def download_manga(start_link, end_link=""):
@@ -13,13 +49,8 @@ def download_manga(start_link, end_link=""):
     if end_link.endswith('1'):
         end_link = end_link[:-6]
 
-    page = requests.post(start_link, data=dict(adult="true"))
-    soup = BeautifulSoup(page.text, 'lxml')
-
-    title = soup.find('h1', {"class": "hb dnone"}).find('a').get('title')
-
-    # Search for invalid characters and remove them.
-    title = re.sub('[^A-Za-z0-9 ]+', '', title)
+    # get title of manga
+    title = gen_title(start_link)
 
     while next_link != end_link:
         # Open initial page
@@ -34,12 +65,7 @@ def download_manga(start_link, end_link=""):
 
         # Find image link and vol. num
         try:
-            volume = soup.find('h1', {"class": "hb dnone"}).findAll('a')
-            volume = volume[1].get('title')
-
-            # Grab first number in title
-            temp = re.findall('\d+', volume)
-            volume = "Volume " + temp[0]
+            volume = get_volume(soup)
             image = soup.find('div', {"class": "inner"}).find('img').get('src')
         except:
             print("Could not find image link. Website is not Twisted Hel Scan page?")
@@ -52,18 +78,36 @@ def download_manga(start_link, end_link=""):
         if not os.path.exists(title):
             os.mkdir(title)
 
-        # Make chapter directory
+        # Make volume directory
         if not os.path.exists(title + "/" + volume):
             os.mkdir(title + "/" + volume)
+            counter = 1
 
-        # Write the image to a file in chapter directory
-        imagefile = open(title + "/" + volume + "/" + str(counter) + ".png", 'wb')
-        imagefile.write(image.content)
-        imagefile.close()
+        # Write image to file
+        write_image(image, title, volume, counter)
         counter += 1
 
         # Find next link
         next_link = soup.find('div', {"class": "inner"}).find('a').get('href')
 
 
-download_manga("http://twistedhelscans.com/read/tokyo_ghoul_re/en/5/47/page/1")
+def on_click(window):
+    """Function for go button"""
+    start_link = window.start_entry.get()
+    end_link = window.end_entry.get()
+
+    if not start_link:
+        print("No start link given")
+        return
+
+    def callback():
+        download_manga(start_link, end_link)
+
+    t = threading.Thread(target=callback)
+    t.start()
+
+
+# Create window and bind go button
+display = Display()
+display.go_button.bind("<Button-1>", lambda x: on_click(display))
+display.root.mainloop()
