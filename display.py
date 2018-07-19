@@ -1,22 +1,26 @@
 from tkinter import *
+import queue
 
 
 class Display:
+    """Handles display for manga downloader"""
 
-    def __init__(self):
+    def __init__(self, queue):
         self.start_label = None
         self.start_entry = None
         self.end_label = None
         self.end_entry = None
         self.go_button = None
+        self.info_label = None
         self.root = None
+        self.queue = queue
         self.create_window()
 
     def create_window(self):
         """Creates window for manga downloader"""
         self.root = Tk()
-        self.root.title("Manga downloader")
-        self.root.geometry("300x300")
+        self.root.title("Manga Downloader")
+        self.root.geometry("400x200")
 
         parent = Frame(self.root)
 
@@ -36,12 +40,25 @@ class Display:
         self.start_entry = Entry(parent)
         self.end_label = Label(parent, text="End link:\n(Leave blank to download entire manga)")
         self.end_entry = Entry(parent)
-        self.go_button = Button(parent, text="Go")
+        self.go_button = Button(parent, text="Go", fg="#a1dbcd", bg="#383a39")
+        self.info_label = Label(parent, text="")
 
         # Pack widgets
         self.start_label.pack(fill='x')
         self.start_entry.pack(fill='x')
         self.end_label.pack(fill='x')
         self.end_entry.pack(fill='x')
-        self.go_button.pack(fill='x')
+        self.go_button.pack(padx=20, pady=20, fill='x')
+        self.info_label.pack(fill='x')
         parent.pack(expand=1)
+
+    def process_incoming(self):
+        """Handle all the messages currently in the queue (if any)."""
+        while not self.queue.empty():
+            try:
+                msg = self.queue.get(0)
+                # Check contents of message and do what it says
+                # As a test, we simply print it
+                self.info_label.config(text=msg)
+            except queue.Empty:
+                pass

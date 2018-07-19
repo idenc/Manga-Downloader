@@ -5,6 +5,7 @@ import os
 import re
 from bs4 import BeautifulSoup
 from display import Display
+import queue
 
 
 def gen_title(link):
@@ -16,10 +17,6 @@ def gen_title(link):
 
     # Search for invalid characters and remove them.
     return re.sub('[^A-Za-z0-9 ]+', '', title)
-
-
-def make_directory(title, volume):
-    """Makes directories for manga"""
 
 
 def get_volume(soup):
@@ -50,7 +47,11 @@ def download_manga(start_link, end_link=""):
         end_link = end_link[:-6]
 
     # get title of manga
-    title = gen_title(start_link)
+    try:
+        title = gen_title(start_link)
+    except:
+        print("Could not find image link. Website is not Twisted Hel Scan page?")
+        return
 
     while next_link != end_link:
         # Open initial page
@@ -60,8 +61,11 @@ def download_manga(start_link, end_link=""):
         if page.url == end_link:
             break
 
-        print(page.url)
+        queue.put(page.url)
         soup = BeautifulSoup(page.text, 'lxml')
+
+        if not end_link:
+            end_link = soup.find('h1', {"class": "hb dnone"}).find('a').get('href')
 
         # Find image link and vol. num
         try:
@@ -89,10 +93,11 @@ def download_manga(start_link, end_link=""):
 
         # Find next link
         next_link = soup.find('div', {"class": "inner"}).find('a').get('href')
+    queue.put("Done")
 
 
 def on_click(window):
-    """Function for go button"""
+    """Fetches text from entries and calls download manga"""
     start_link = window.start_entry.get()
     end_link = window.end_entry.get()
 
@@ -107,7 +112,19 @@ def on_click(window):
     t.start()
 
 
+def periodic_call():
+    """
+    Check every 100 ms if there is something new in the queue.
+    """
+    display.process_incoming()
+    display.root.after(100, periodic_call)
+
+
 # Create window and bind go button
-display = Display()
+queue = queue.Queue()
+display = Display(queue)
 display.go_button.bind("<Button-1>", lambda x: on_click(display))
+display.info_label.config(text="Hello!")
+periodic_call()
 display.root.mainloop()
+os._exit(1)
