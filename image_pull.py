@@ -1,11 +1,11 @@
 import threading
-
 import requests
 import os
 import re
+import queue
+
 from bs4 import BeautifulSoup
 from display import Display
-import queue
 
 
 def gen_title(link):
@@ -50,7 +50,7 @@ def download_manga(start_link, end_link=""):
     try:
         title = gen_title(start_link)
     except:
-        print("Could not find image link. Website is not Twisted Hel Scan page?")
+        queue.put("Title not found")
         return
 
     while next_link != end_link:
@@ -72,7 +72,7 @@ def download_manga(start_link, end_link=""):
             volume = get_volume(soup)
             image = soup.find('div', {"class": "inner"}).find('img').get('src')
         except:
-            print("Could not find image link. Website is not Twisted Hel Scan page?")
+            queue.put("Could not find image link. Website is not Twisted Hel Scan page?")
             return
 
         # Download the image
@@ -101,8 +101,8 @@ def on_click(window):
     start_link = window.start_entry.get()
     end_link = window.end_entry.get()
 
-    if not start_link:
-        print("No start link given")
+    if not start_link.strip():
+        queue.put("No start link given")
         return
 
     def callback():
@@ -110,6 +110,8 @@ def on_click(window):
 
     t = threading.Thread(target=callback)
     t.start()
+    display.progress.pack(fill='x')
+    display.progress.start(15)
 
 
 def periodic_call():
@@ -124,7 +126,6 @@ def periodic_call():
 queue = queue.Queue()
 display = Display(queue)
 display.go_button.bind("<Button-1>", lambda x: on_click(display))
-display.info_label.config(text="Hello!")
 periodic_call()
 display.root.mainloop()
 os._exit(1)

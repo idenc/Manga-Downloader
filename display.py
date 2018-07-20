@@ -1,4 +1,5 @@
-from tkinter import *
+import tkinter as tk
+from tkinter.ttk import Progressbar
 import queue
 
 
@@ -13,16 +14,17 @@ class Display:
         self.go_button = None
         self.info_label = None
         self.root = None
+        self.progress = None
         self.queue = queue
         self.create_window()
 
     def create_window(self):
         """Creates window for manga downloader"""
-        self.root = Tk()
+        self.root = tk.Tk()
         self.root.title("Manga Downloader")
         self.root.geometry("400x200")
 
-        parent = Frame(self.root)
+        parent = tk.Frame(self.root)
 
         # Gets the requested values of the height and width.
         window_width = self.root.winfo_reqwidth()
@@ -36,12 +38,13 @@ class Display:
         self.root.geometry("+{}+{}".format(position_right, position_down))
 
         # Widgets
-        self.start_label = Label(parent, text="Start link:")
-        self.start_entry = Entry(parent)
-        self.end_label = Label(parent, text="End link:\n(Leave blank to download entire manga)")
-        self.end_entry = Entry(parent)
-        self.go_button = Button(parent, text="Go", fg="#a1dbcd", bg="#383a39")
-        self.info_label = Label(parent, text="")
+        self.start_label = tk.Label(parent, text="Start link:")
+        self.start_entry = tk.Entry(parent)
+        self.end_label = tk.Label(parent, text="End link:\n(Leave blank to download entire manga)")
+        self.end_entry = tk.Entry(parent)
+        self.go_button = tk.Button(parent, text="Go", fg="#a1dbcd", bg="#383a39")
+        self.info_label = tk.Label(self.root, text="Hello!", bd=1, relief='sunken', anchor='w')
+        self.progress = Progressbar(parent, orient='horizontal', mode='indeterminate')
 
         # Pack widgets
         self.start_label.pack(fill='x')
@@ -49,8 +52,8 @@ class Display:
         self.end_label.pack(fill='x')
         self.end_entry.pack(fill='x')
         self.go_button.pack(padx=20, pady=20, fill='x')
-        self.info_label.pack(fill='x')
-        parent.pack(expand=1)
+        self.info_label.pack(side='bottom', fill='x')
+        parent.pack()
 
     def process_incoming(self):
         """Handle all the messages currently in the queue (if any)."""
