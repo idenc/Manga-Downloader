@@ -1,10 +1,11 @@
-import threading
-import requests
 import os
-import re
 import queue
+import re
+import threading
 
+import requests
 from bs4 import BeautifulSoup
+
 from display import Display
 
 
@@ -32,9 +33,13 @@ def get_volume(soup):
 def write_image(image, title, volume, counter):
     """Writes image to a file"""
     # Write the image to a file in chapter directory
-    imagefile = open(title + "/" + volume + "/" + str(counter) + ".png", 'wb')
-    imagefile.write(image.content)
-    imagefile.close()
+    try:
+        imagefile = open(title + "/" + volume + "/" + str(counter) + ".png", 'wb')
+        imagefile.write(image.content)
+        imagefile.close()
+    except IOError:
+        queue.put("Could not write image")
+        return
 
 
 def download_manga(start_link, end_link=""):
@@ -49,8 +54,8 @@ def download_manga(start_link, end_link=""):
     # get title of manga
     try:
         title = gen_title(start_link)
-    except:
-        queue.put("Title not found")
+    except requests.exceptions.MissingSchema:
+        queue.put("Could not find title. Website is not Twisted Hel Scan page?")
         return
 
     while next_link != end_link:
@@ -71,7 +76,7 @@ def download_manga(start_link, end_link=""):
         try:
             volume = get_volume(soup)
             image = soup.find('div', {"class": "inner"}).find('img').get('src')
-        except:
+        except requests.exceptions.MissingSchema:
             queue.put("Could not find image link. Website is not Twisted Hel Scan page?")
             return
 
@@ -80,11 +85,20 @@ def download_manga(start_link, end_link=""):
 
         # Make manga directory
         if not os.path.exists(title):
-            os.mkdir(title)
+            try:
+                os.mkdir(title)
+            except IOError:
+                queue.put("Could not make directory")
+                return
 
         # Make volume directory
         if not os.path.exists(title + "/" + volume):
-            os.mkdir(title + "/" + volume)
+            try:
+                os.mkdir(title + "/" + volume)
+            except IOError:
+                queue.put("Could not make directory")
+                return
+
             counter = 1
 
         # Write image to file
