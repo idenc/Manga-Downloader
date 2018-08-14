@@ -3,10 +3,26 @@ import queue
 import re
 import threading
 
-import requests
-from bs4 import BeautifulSoup
+from requests_html import HTMLSession
 
 from display import Display
+
+
+def gen_title(page):
+    """Finds title of manga and removes any illegal characters"""
+    title = page.html.find('h1.hb.dnone', first=True).find('a', first=True).attrs['title']
+
+    # Search for invalid characters and remove them.
+    return re.sub('[^A-Za-z0-9 ]+', '', title)
+
+
+def get_volume(page):
+    """Finds volume num"""
+    volume = page.html.find('h1.hb.dnone', first=True).find('a')[1].attrs['title']
+
+    # Grab first number in title
+    temp = re.findall('\d+', volume)
+    return "Volume " + temp[0]
 
 
 class ImagePull:
@@ -29,37 +45,40 @@ class ImagePull:
         if end_link.endswith('1'):
             end_link = end_link[:-6]
 
+        # Initial page
+        session = HTMLSession()
+        page = session.post(start_link, data=dict(adult="true"))
+
         # get title of manga
         try:
-            title = self.gen_title(start_link)
-        except requests.exceptions.MissingSchema:
+            title = gen_title(page)
+        except:
             self.queue.put("Could not find title. Website is not Twisted Hel Scan page?")
             return
 
         while next_link != end_link:
-            # Open initial page
-            page = requests.post(next_link, data=dict(adult="true"))
+            # Open next page
+            page = session.post(next_link, data=dict(adult="true"))
 
             # check if end link is first page redirect
             if page.url == end_link:
                 break
 
             self.queue.put(page.url)
-            soup = BeautifulSoup(page.text, 'lxml')
 
             if not end_link:
-                end_link = soup.find('h1', {"class": "hb dnone"}).find('a').get('href')
+                end_link = page.html.find('h1.hb.dnone', first=True).find('a', first=True).attrs['href']
 
             # Find image link and vol. num
             try:
-                volume = self.get_volume(soup)
-                image = soup.find('div', {"class": "inner"}).find('img').get('src')
-            except requests.exceptions.MissingSchema:
+                volume = get_volume(page)
+                image = page.html.find('div.inner', first=True).find('img', first=True).attrs['src']
+            except:
                 self.queue.put("Could not find image link. Website is not Twisted Hel Scan page?")
                 return
 
             # Download the image
-            image = requests.get(image)
+            image = session.get(image)
 
             # Make manga directory
             if not os.path.exists(title):
@@ -84,27 +103,8 @@ class ImagePull:
             counter += 1
 
             # Find next link
-            next_link = soup.find('div', {"class": "inner"}).find('a').get('href')
+            next_link = page.html.find('div.inner', first=True).find('a', first=True).attrs['href']
         self.queue.put("Done")
-
-    def gen_title(self, link):
-        """Finds title of manga and removes any illegal characters"""
-        page = requests.post(link, data=dict(adult="true"))
-        soup = BeautifulSoup(page.text, 'lxml')
-
-        title = soup.find('h1', {"class": "hb dnone"}).find('a').get('title')
-
-        # Search for invalid characters and remove them.
-        return re.sub('[^A-Za-z0-9 ]+', '', title)
-
-    def get_volume(self, soup):
-        """Finds volume num"""
-        volume = soup.find('h1', {"class": "hb dnone"}).findAll('a')
-        volume = volume[1].get('title')
-
-        # Grab first number in title
-        temp = re.findall('\d+', volume)
-        return "Volume " + temp[0]
 
     def write_image(self, image, title, volume, counter):
         """Writes image to a file"""
